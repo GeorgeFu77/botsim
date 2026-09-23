@@ -1,0 +1,17 @@
+{
+  "name": "botsim",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Live paper-trading simulator for Polymarket BTC 5-minute Up/Down markets. PAPER TRADING ONLY \u2014 never places real orders.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/main.js",
+    "collectors": "node src/collectors/run-collectors.js",
+    "hud": "node hud/server.js",
+    "report": "node src/persistence/print-report.js",
+    "ledger": "node src/persistence/build-ledger.js"
+  }
+}

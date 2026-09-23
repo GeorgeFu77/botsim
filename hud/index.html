@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JARVIS / George's OS</title>
+<style>
+  :root {
+    --bg: #0a0b07;
+    --line: #1e2214;
+    --olive: #6f7842;
+    --green: #c9d64c;
+    --bright: #e6f278;
+    --text: #a8ad97;
+    --white: #e9ecdc;
+    --red: #ff5040;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 12px/1.6 ui-monospace, "SF Mono", Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+  }
+  .lbl {
+    font-size: 12px; letter-spacing: .24em; text-transform: uppercase;
+    color: var(--olive); margin-bottom: 8px;
+  }
+  .lbl b { color: var(--green); font-weight: 600; }
+
+  header {
+    display: flex; align-items: baseline; gap: 24px;
+    padding: 12px 22px; border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 13px; font-weight: 700; letter-spacing: .4em; color: var(--white); }
+  #sysline { flex: 1; text-align: center; letter-spacing: .28em; text-transform: uppercase; font-size: 12px; color: var(--olive); }
+  #sysline .on { color: var(--green); }
+  #sysline .off { color: var(--red); }
+  #clock { font-size: 22px; color: var(--bright); text-shadow: 0 0 12px rgba(201,214,76,.35); }
+  #clock small { font-size: 13px; color: var(--olive); }
+  #hdr-btc { font-size: 18px; color: var(--olive); letter-spacing: .04em; white-space: nowrap; }
+  #hdr-btc b { color: var(--bright); font-weight: 700; text-shadow: 0 0 12px rgba(201,214,76,.35); }
+  #hdr-btc .dot { color: var(--green); font-size: 11px; vertical-align: 2px; }
+  #hdr-btc.stale b { color: var(--olive); text-shadow: none; }
+
+  main {
+    display: grid; height: calc(100vh - 46px);
+    grid-template-columns: 290px 1fr 400px;
+  }
+  .col { padding: 16px 20px; overflow: hidden; display: flex; flex-direction: column; gap: 18px; }
+  .col.left { border-right: 1px solid var(--line); }
+  .col.right { border-left: 1px solid var(--line); }
+
+  .metric { border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+  .metric .val { font-size: 24px; color: var(--white); }
+  .metric .val.pos { color: var(--green); }
+  .metric .val.neg { color: var(--red); }
+  .metric canvas { display: block; margin-top: 4px; opacity: .9; }
+
+  ol { list-style: none; }
+  ol li { padding: 2px 0; color: var(--text); }
+  ol li::before { content: counter(d) ") "; counter-increment: d; color: var(--olive); }
+  ol { counter-reset: d; }
+
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 2px 8px 2px 0; vertical-align: baseline; }
+  td:last-child { padding-right: 0; }
+  td.num { text-align: right; white-space: nowrap; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .mut { color: var(--olive); }
+  .wht { color: var(--white); }
+
+  /* center: the core */
+  .center { display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 8px 0 18px; position: relative; }
+  #corewrap { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; }
+  #corewrap::before {
+    content: ""; position: absolute; width: 70%; padding-top: 70%;
+    background: radial-gradient(circle, rgba(201,214,76,.10) 0%, rgba(201,214,76,.03) 45%, transparent 70%);
+    border-radius: 50%;
+  }
+  #core { position: relative; }
+  .cta {
+    font: inherit; font-size: 13px; letter-spacing: .3em; text-transform: uppercase;
+    background: transparent; color: var(--green); border: 1px solid var(--olive);
+    padding: 10px 36px 10px 42px; cursor: pointer;
+  }
+  .cta:hover:not(:disabled) { border-color: var(--green); box-shadow: 0 0 18px rgba(201,214,76,.25); }
+  .cta:focus-visible { outline: 1px solid var(--bright); outline-offset: 2px; }
+  .cta:disabled { color: var(--olive); cursor: default; }
+  #btnrow { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+  #btnrow .cta { font-size: 12px; padding: 7px 22px 7px 28px; }
+  #livebtn.armed { color: var(--red); border-color: var(--red); box-shadow: 0 0 18px rgba(255,80,64,.35); }
+  #livebtn.armed:hover { border-color: var(--red); box-shadow: 0 0 24px rgba(255,80,64,.5); }
+  #livenote { margin-top: 6px; font-size: 12px; text-align: center; }
+
+  #primary { text-align: center; }
+  #primary .lbl { margin-bottom: 2px; }
+  #bignum {
+    font-size: 54px; font-weight: 700; color: var(--white);
+    text-shadow: 0 0 24px rgba(201,214,76,.4); line-height: 1.15;
+  }
+  #bignum.neg { color: var(--red); text-shadow: 0 0 24px rgba(255,80,64,.35); }
+  #bignum small { font-size: 16px; color: var(--olive); font-weight: 400; }
+  #substats { color: var(--olive); letter-spacing: .14em; text-transform: uppercase; }
+
+  #skills { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+  #skills span { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #skills span::before { content: "▸ "; color: var(--olive); }
+  #skills span.kep { color: var(--white); }
+
+  section.grow { min-height: 0; overflow-y: auto; }
+  section.grow::-webkit-scrollbar { width: 5px; }
+  section.grow::-webkit-scrollbar-thumb { background: var(--line); }
+  .strat-name { font-size: 22px; color: var(--bright); text-shadow: 0 0 14px rgba(201,214,76,.35); line-height: 1.2; }
+  .strat-name .dot { color: var(--green); font-size: 13px; vertical-align: 3px; margin-right: 7px; }
+  .strat-params { color: var(--olive); font-size: 12px; margin-top: 2px; word-break: break-word; }
+  .strat-desc { color: var(--text); margin-top: 10px; }
+  .strat-status { color: var(--olive); margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12px; }
+  .strat-status.warn { color: var(--red); }
+  .sig { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--line); }
+  .sig .sk { color: var(--olive); letter-spacing: .1em; text-transform: uppercase; font-size: 12px; }
+  .sig .sv { color: var(--white); font-size: 15px; }
+  .sig .sv.pos { color: var(--green); } .sig .sv.neg { color: var(--red); }
+  .sig .sv.nodata { color: var(--olive); font-size: 12px; font-style: italic; }
+  #jarvisCurve { width: 100%; height: 40px; display: block; margin: 8px 0 4px; }
+  #jarvisCurve polyline { fill: none; stroke: var(--green); stroke-width: 1.5; }
+  #jarvisCurve line { stroke: var(--olive); stroke-dasharray: 3 3; opacity: .6; }
+  #j24pnl { font-size: 42px; line-height: 1.1; }
+  .think-call { font-size: 20px; color: var(--white); margin-top: 4px; }
+  .evidence { margin-top: 12px; }
+  .ev { display: flex; align-items: center; gap: 9px; padding: 3px 0; }
+  .evlabel { flex: 0 0 116px; color: var(--olive); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .evbar { flex: 1; height: 8px; background: var(--line); border-radius: 2px; overflow: hidden; }
+  .evfill { height: 100%; border-radius: 2px; }
+  .evfill.up { background: var(--green); }
+  .evfill.dn { background: var(--red); }
+  .evval { flex: 0 0 48px; text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; }
+  @media (max-width: 1050px) {
+    body { overflow: auto; }
+    main { grid-template-columns: 1fr; height: auto; }
+    .col.left, .col.right { border: none; border-top: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>J.A.R.V.I.S</h1>
+  <div id="sysline">booting</div>
+  <div id="hdr-btc">btc <b>--</b></div>
+  <div id="clock">--:--<small>:--</small></div>
+</header>
+<main>
+  <div class="col left">
+    <section>
+      <div class="lbl"><b>jarvis</b> / last 24h</div>
+      <div id="j24pnl" class="val">--</div>
+      <div id="j24sub" class="mut"></div>
+    </section>
+    <section class="grow">
+      <div class="lbl"><b>thinking</b> / why it's deciding</div>
+      <div id="jthinkCall" class="think-call">warming up…</div>
+      <div id="jthinkP" class="mut"></div>
+      <div id="jevidence" class="evidence"></div>
+      <div id="jthinkNote" class="mut" style="margin-top:12px"></div>
+    </section>
+  </div>
+
+  <div class="col center">
+    <div id="corewrap">
+      <canvas id="core"></canvas>
+    </div>
+    <div id="primary">
+      <div class="lbl">primary directive · paper to live</div>
+      <div id="bignum">--</div>
+      <div id="substats"></div>
+      <div id="btnrow">
+        <button id="livebtn" class="cta">live · off</button>
+      </div>
+      <div id="livenote" class="mut"></div>
+    </div>
+  </div>
+
+  <div class="col right">
+    <section id="jarvispanel">
+      <div class="lbl"><b>jarvis</b> / the ai · live paper</div>
+      <div id="jarvisCall" class="strat-name">warming up…</div>
+      <div id="jarvisStats" class="mut"></div>
+      <svg id="jarvisCurve" viewBox="0 0 300 40" preserveAspectRatio="none"></svg>
+      <div id="jarvisFrame" class="strat-status"></div>
+    </section>
+    <section class="grow">
+      <div class="lbl"><b>senses</b> / what it's reading</div>
+      <div class="sig"><span class="sk">fear &amp; greed</span><span class="sv" id="sigFng">—</span></div>
+      <div class="sig"><span class="sk">news tilt</span><span class="sv" id="sigNews">—</span></div>
+      <div class="sig"><span class="sk">whale flow</span><span class="sv" id="sigWhale">—</span></div>
+    </section>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = v => (v >= 0 ? '+' : '') + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pnl = v => `<span class="${v >= 0 ? 'pos' : 'neg'}">${fmt(v)}</span>`;
+
+function tick() {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  $('clock').innerHTML = `${p(d.getHours())}:${p(d.getMinutes())}<small>:${p(d.getSeconds())}</small>`;
+}
+setInterval(tick, 1000); tick();
+
+function ago(ms) {
+  if (!ms) return '';
+  const s = Math.round((Date.now() - ms) / 1000);
+  if (s < 90) return s + 's';
+  if (s < 5400) return Math.round(s / 60) + 'm';
+  if (s < 129600) return Math.round(s / 3600) + 'h';
+  return Math.round(s / 86400) + 'd';
+}
+
+function spark(id, series, baseline) {
+  const c = $(id), ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  if (!series || series.length < 2) return;
+  const min = Math.min(...series, baseline ?? Infinity), max = Math.max(...series, baseline ?? -Infinity);
+  const x = i => (i / (series.length - 1)) * (c.width - 4) + 2;
+  const y = v => c.height - 3 - ((v - min) / (max - min || 1)) * (c.height - 6);
+  if (baseline !== undefined && min < baseline) {
+    ctx.strokeStyle = 'rgba(111,120,66,.5)'; ctx.setLineDash([2, 3]);
+    ctx.beginPath(); ctx.moveTo(0, y(baseline)); ctx.lineTo(c.width, y(baseline)); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.strokeStyle = '#c9d64c'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  series.forEach((v, i) => i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)));
+  ctx.stroke();
+  ctx.fillStyle = '#e6f278';
+  ctx.fillRect(x(series.length - 1) - 1.5, y(series[series.length - 1]) - 1.5, 3, 3);
+}
+
+/* ── the core: fibonacci sphere point cloud ── */
+const core = $('core'), cctx = core.getContext('2d');
+const N = 850, pts = [];
+for (let i = 0; i < N; i++) {
+  const t = (i + 0.5) / N, phi = Math.acos(1 - 2 * t), th = Math.PI * (1 + Math.sqrt(5)) * i;
+  pts.push([Math.sin(phi) * Math.cos(th), Math.cos(phi), Math.sin(phi) * Math.sin(th)]);
+}
+const pairs = [];
+for (let i = 0; i < N && pairs.length < 2300; i++)
+  for (let j = i + 1; j < N; j++) {
+    const d = pts[i][0] * pts[j][0] + pts[i][1] * pts[j][1] + pts[i][2] * pts[j][2];
+    if (d > 0.9974) pairs.push([i, j]);
+  }
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const orb = { phase: 'standby', talkUntil: 0 };
+// smoothly-lerped dynamics: rotation speed, pulse amplitude/frequency, brightness, line glow, contraction
+const cur = { speed: 0.5, amp: 0.01, hz: 1, bright: 0.6, line: 0.5, squeeze: 1 };
+
+const jit = pts.map(() => 0.93 + Math.random() * 0.12);   // organic shell, not a perfect lattice
+const twk = pts.map(() => Math.random() * Math.PI * 2);   // per-point twinkle phase
+const corePts = [];
+for (let i = 0; i < 240; i++) {
+  const t = (i + 0.5) / 240, phi = Math.acos(1 - 2 * t), th = Math.PI * (1 + Math.sqrt(5)) * i * 1.618;
+  const r = 0.30 + Math.random() * 0.22;
+  corePts.push([Math.sin(phi) * Math.cos(th) * r, Math.cos(phi) * r, Math.sin(phi) * Math.sin(th) * r]);
+}
+const dust = Array.from({ length: 70 }, () => ({
+  x: Math.random(), y: Math.random(), s: 0.4 + Math.random() * 1.1,
+  v: 0.004 + Math.random() * 0.012, p: Math.random() * 7,
+}));
+let ripples = [], lastRipple = 0, angle = 0, lastT = 0;
+
+function sizeCore() {
+  const s = Math.max(240, Math.min(window.innerHeight * 0.58, 620));
+  core.width = core.height = s;
+}
+sizeCore(); addEventListener('resize', sizeCore);
+
+function targets(now) {
+  const mode = (orb.phase === 'listening' && now < orb.talkUntil) ? 'talking' : orb.phase;
+  switch (mode) {
+    case 'talking':  return { speed: 1.5, amp: 0.085, hz: 7.5, bright: 1.4, line: 1.5, squeeze: 1 };
+    case 'thinking': return { speed: 4.5, amp: 0.02, hz: 3, bright: 1.2, line: 1.3, squeeze: 0.94 };
+    case 'speaking': return { speed: 1.2, amp: 0.05, hz: 2.2, bright: 1.25, line: 1.2, squeeze: 1 };
+    case 'listening': return { speed: 1, amp: 0.015, hz: 1.1, bright: 1, line: 1, squeeze: 1 };
+    case 'standby':  return { speed: 0.6, amp: 0.01, hz: 0.8, bright: 0.75, line: 0.7, squeeze: 1 };
+    default:         return { speed: 0.35, amp: 0.006, hz: 0.5, bright: 0.5, line: 0.4, squeeze: 1 };
+  }
+}
+
+function drawCore(now) {
+  const dt = Math.min(50, now - lastT || 16); lastT = now;
+  const tg = targets(now);
+  for (const k in tg) cur[k] += (tg[k] - cur[k]) * 0.06;
+  angle += cur.speed * dt / 9000;
+
+  const s = core.width, cx = s / 2, cy = s / 2;
+  const R = s * 0.38 * cur.squeeze;
+  const wob = Math.sin(now / 3100) * 0.12;
+  const pulse = 1 + cur.amp * Math.sin(now / 1000 * cur.hz * Math.PI * 2)
+    + (cur.amp > 0.05 ? cur.amp * 0.4 * Math.sin(now / 61) : 0);
+  const ca = Math.cos(angle), sa = Math.sin(angle), cw = Math.cos(wob), sw = Math.sin(wob);
+  const B = cur.bright;
+  cctx.clearRect(0, 0, s, s);
+
+  for (const d of dust) {
+    d.y -= d.v * dt / 100; if (d.y < 0) { d.y = 1; d.x = Math.random(); }
+    cctx.fillStyle = `rgba(201,214,76,${(0.05 + 0.1 * Math.abs(Math.sin(now / 1400 + d.p))) * B})`;
+    cctx.fillRect(d.x * s, d.y * s, d.s, d.s);
+  }
+
+  const rot = (p, rj) => {
+    let X = p[0] * ca + p[2] * sa, Z = p[2] * ca - p[0] * sa;
+    let Y = p[1] * cw - Z * sw; Z = Z * cw + p[1] * sw;
+    const k = R * pulse * rj * (1 / (1.7 - Z * 0.55));
+    return [cx + X * k, cy + Y * k, Z];
+  };
+  const proj = pts.map((p, i) => rot(p, jit[i]));
+
+  // lines batched into alpha buckets: one stroke per bucket instead of per pair
+  const buckets = [[], [], [], []];
+  for (const [i, j] of pairs) {
+    const z = (proj[i][2] + proj[j][2]) / 2;
+    if (z < -0.25) continue;
+    buckets[Math.min(3, ((z + 0.25) * 3.2) | 0)].push(i, j);
+  }
+  cctx.lineWidth = 0.5;
+  buckets.forEach((b, bi) => {
+    cctx.strokeStyle = `rgba(201,214,76,${Math.min(0.5, (0.05 + bi * 0.045) * cur.line * B)})`;
+    cctx.beginPath();
+    for (let k = 0; k < b.length; k += 2) {
+      cctx.moveTo(proj[b[k]][0], proj[b[k]][1]);
+      cctx.lineTo(proj[b[k + 1]][0], proj[b[k + 1]][1]);
+    }
+    cctx.stroke();
+  });
+
+  proj.forEach(([X, Y, Z], i) => {
+    const b = (Z + 1) / 2;
+    const tw = 0.75 + 0.25 * Math.sin(now / 700 + twk[i]);
+    cctx.fillStyle = `rgba(${180 + 50 * b},${200 + 42 * b},${70 + 50 * b},${Math.min(1, (0.2 + 0.75 * b) * tw * B)})`;
+    const r = (0.7 + 1.6 * b) * (B > 1.2 ? 1.25 : 1);
+    cctx.fillRect(X - r / 2, Y - r / 2, r, r);
+  });
+
+  // bright inner core
+  for (const p of corePts) {
+    const [X, Y, Z] = rot(p, 1);
+    cctx.fillStyle = `rgba(230,242,120,${Math.min(1, (0.25 + 0.5 * (Z + 1) / 2) * B)})`;
+    cctx.fillRect(X - 0.8, Y - 0.8, 1.6, 1.6);
+  }
+
+  // ripple rings while jarvis speaks
+  if (orb.phase === 'speaking' && now - lastRipple > 650) { ripples.push({ t: now }); lastRipple = now; }
+  ripples = ripples.filter(r => now - r.t < 1600);
+  for (const r of ripples) {
+    const f = (now - r.t) / 1600;
+    cctx.strokeStyle = `rgba(201,214,76,${0.35 * (1 - f)})`;
+    cctx.lineWidth = 1;
+    cctx.beginPath(); cctx.arc(cx, cy, R * (1 + f * 0.45), 0, 7); cctx.stroke();
+  }
+
+  if (!still) requestAnimationFrame(drawCore);
+}
+requestAnimationFrame(drawCore);
+
+// the core idles at a steady ambient glow (orb.phase stays 'standby').
+
+/* ── live BTC in the header: server proxies coinbase, refreshed every second ── */
+async function fetchBtc() {
+  try {
+    const b = await (await fetch('/api/btc')).json();
+    if (b.price == null) return;
+    const el = $('hdr-btc'), stale = Date.now() - b.at > 5000;
+    el.className = stale ? 'stale' : '';
+    el.innerHTML = `btc <b>$${Math.round(b.price).toLocaleString()}</b>` + (stale ? '' : ' <span class="dot">●</span>');
+  } catch { /* keep last frame */ }
+}
+setInterval(fetchBtc, 1000); fetchBtc();
+
+/* ── data ── */
+function render(d) {
+  const t = d.trading || {}, st = d.stats || {}, dd = d.data || { feeds: [], total: 0 };
+
+  $('sysline').innerHTML = [
+    ['sim', dd.simRunning],
+  ].map(([n, on]) => `${n} · <span class="${on ? 'on' : 'off'}">${on ? 'alive' : 'down'}</span>`).join(' &nbsp; ');
+
+  const big = $('bignum'), v = st.totalPnl || 0;
+  big.className = v < 0 ? 'neg' : '';
+  big.innerHTML = `${fmt(v)} <small>paper usd</small>`;
+  $('substats').textContent =
+    `${(st.totalTrades || 0).toLocaleString()} trades · ${(st.winRate || 0).toFixed(0)}% wins · gen ${t.gen ?? '--'} · snapshot ${ago(t.snapshotAt) || '--'} ago`;
+
+  // ── jarvis mind (left): 24h P&L + live thinking with evidence ──
+  const jm = d.jarvis;
+  if (jm) {
+    const pnl = jm.pnl24h || 0;
+    $('j24pnl').textContent = (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2);
+    $('j24pnl').className = 'val ' + (pnl > 0 ? 'pos' : pnl < 0 ? 'neg' : '');
+    $('j24sub').textContent = jm.trades24h
+      ? `${jm.trades24h} bets · ${jm.winRate24h}% win`
+      : (jm.warming ? `warming up · ${jm.n}/${jm.warmup} windows before it starts betting` : 'no bets in the last 24h');
+    const c = jm.current;
+    if (c) {
+      $('jthinkCall').innerHTML = `leaning <b class="${c.side === 'UP' ? 'pos' : 'neg'}">${c.side}</b>`
+        + (c.act ? ` <span class="pos">· BET $${(c.size ?? 0).toLocaleString()}</span>` : ' <span class="mut">· watching</span>');
+      $('jthinkP').textContent = `p(up) = ${(c.p * 100).toFixed(1)}%  ·  ${((1 - c.fracLeft) * 300).toFixed(0)}s into the window`;
+      const ev = c.evidence || [];
+      const maxC = Math.max(0.01, ...ev.map(e => Math.abs(e.c)));
+      $('jevidence').innerHTML = ev.map(e => {
+        const w = Math.round(Math.abs(e.c) / maxC * 100), up = e.c >= 0;
+        return `<div class="ev"><span class="evlabel">${esc(e.label)}</span>`
+          + `<span class="evbar"><span class="evfill ${up ? 'up' : 'dn'}" style="width:${w}%"></span></span>`
+          + `<span class="evval ${up ? 'pos' : 'neg'}">${up ? '↑' : '↓'}${Math.abs(e.c).toFixed(2)}</span></div>`;
+      }).join('');
+      $('jthinkNote').textContent = jm.warming
+        ? 'still learning which signals (and combinations of them) matter — barely moving the call yet'
+        : (ev[0] ? `weighing "${ev[0].label}" heaviest right now — it picked that, not us` : '');
+    } else {
+      $('jthinkCall').textContent = 'no live call yet — waiting for a window';
+      $('jevidence').innerHTML = ''; $('jthinkP').textContent = '';
+    }
+  } else {
+    $('j24pnl').textContent = '--';
+    $('jthinkCall').textContent = 'jarvis offline — start the live sim';
+  }
+  // ── live trading switch (inert scaffold until setup is complete) ──
+  const lv = d.live || { armed: false, scaffold: true, configEnabled: false };
+  const lb = $('livebtn');
+  lb.classList.toggle('armed', lv.armed);
+  lb.textContent = lv.armed ? '● LIVE · click to kill' : 'live · off';
+  $('livenote').textContent = lv.armed
+    ? `armed: ${lv.family || '?'}${lv.scaffold || !lv.configEnabled ? ' · inert (setup incomplete — dry-run only)' : ` · spent today $${(lv.spent?.today || 0).toFixed(0)}`}`
+    : (lv.note ? `live off · ${lv.note}` : '');
+
+  // ── jarvis: the online AI's live call + learned hit-rate ──
+  const j = d.jarvis;
+  if (j) {
+    const c = j.current;
+    $('jarvisCall').innerHTML = c
+      ? `<span class="dot">●</span>call <b class="${c.side === 'UP' ? 'pos' : 'neg'}">${c.side}</b> `
+        + `<span class="mut">p=${(c.p * 100).toFixed(1)}%</span> `
+        + (c.act ? `<span class="pos">· BET $${(c.size ?? 0).toLocaleString()}</span>` : '<span class="mut">· watching</span>')
+        + `<span class="mut"> · ${(c.fracLeft * 300).toFixed(0)}s left</span>`
+      : '<span class="mut">no live call yet</span>';
+    $('jarvisStats').innerHTML =
+      `hit ${j.hitRate != null ? `<b class="${j.beatsCoin ? 'pos' : 'wht'}">${j.hitRate}%</b>` : '—'} `
+      + `<span class="mut">on ${j.acted} bets · Brier ${j.brier ?? '—'} · seen ${j.seen}</span>`;
+    const cv = j.curve || [], W = 300, H = 40;
+    const pts = cv.map((v, i) => `${(i / Math.max(1, cv.length - 1) * W).toFixed(1)},${(H - v * H).toFixed(1)}`).join(' ');
+    $('jarvisCurve').innerHTML = `<line x1="0" y1="${H / 2}" x2="${W}" y2="${H / 2}"/>` + (pts ? `<polyline points="${pts}"/>` : '');
+    $('jarvisFrame').textContent = j.beatsCoin
+      ? 'beating the coin flip (CI clears 50%)'
+      : '50% = coin flip · needs ~100+ bets with the band above 50% to mean anything';
+    $('jarvisFrame').className = 'strat-status' + (j.beatsCoin ? ' pos' : '');
+  } else {
+    $('jarvisCall').textContent = 'jarvis offline — start the live sim (npm start)';
+    $('jarvisStats').textContent = '';
+    $('jarvisFrame').textContent = '';
+  }
+
+
+  // ── live senses (the bot's information feeds) ──
+  const sig = d.signals || {};
+  const fng = sig.fng;
+  $('sigFng').className = 'sv' + (fng ? (fng.value >= 55 ? ' pos' : fng.value <= 45 ? ' neg' : '') : ' nodata');
+  $('sigFng').textContent = fng ? `${fng.value} · ${fng.classification}` : 'no data';
+  const nw = sig.news;
+  $('sigNews').className = 'sv' + (nw ? (nw.score > 0.05 ? ' pos' : nw.score < -0.05 ? ' neg' : '') : ' nodata');
+  $('sigNews').textContent = nw ? `${nw.score >= 0 ? '+' : ''}${nw.score} · ${nw.count} hl` : 'no data';
+  const wh = sig.whale;
+  $('sigWhale').className = 'sv' + (wh ? '' : ' nodata');
+  $('sigWhale').textContent = wh ? `${wh.netBtc} BTC · ${wh.count} polls` : 'no data';
+
+}
+
+$('livebtn').addEventListener('click', async () => {
+  const armed = $('livebtn').classList.contains('armed');
+  // Kill is INSTANT — no confirm, no friction. Arming asks once.
+  if (!armed && !confirm('Arm LIVE trading for the current champion?\n\nInert until wallet setup is complete (dry-run only until then). Click the button again at any time to kill instantly.')) return;
+  try {
+    const r = await fetch('/api/live/toggle', { method: 'POST' });
+    const j = await r.json();
+    if (j.error) $('livenote').textContent = 'live off · ' + j.error;
+  } catch { /* next poll re-syncs */ }
+  refresh();
+});
+async function refresh() {
+  try { render(await (await fetch('/api/hud')).json()); } catch { /* keep last frame */ }
+}
+setInterval(refresh, 5000); refresh();
+</script>
+</body>
+</html>

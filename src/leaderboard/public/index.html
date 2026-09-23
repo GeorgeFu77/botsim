@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BotSim — Polymarket BTC 5m Leaderboard</title>
+    <style>
+      :root {
+        --bg: #0b0e14;
+        --panel: #141925;
+        --panel2: #1b2233;
+        --line: #232c40;
+        --text: #e7ecf3;
+        --muted: #8a96ad;
+        --green: #16c784;
+        --red: #ea3943;
+        --accent: #4c8dff;
+        --up: #16c784;
+        --down: #ea3943;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      header {
+        position: sticky; top: 0; z-index: 5;
+        background: linear-gradient(180deg, #0d1119 0%, #0b0e14 100%);
+        border-bottom: 1px solid var(--line);
+        padding: 12px 18px;
+      }
+      .titlebar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .titlebar h1 { font-size: 16px; margin: 0; letter-spacing: .3px; }
+      .badge { font-size: 11px; padding: 3px 8px; border-radius: 999px; font-weight: 700; }
+      .paper { background: #3a2a05; color: #ffcf5c; border: 1px solid #6b5310; }
+      .live { background: #052a1a; color: #54e0a6; border: 1px solid #135f41; }
+      .pulse { animation: pulse 1s ease; }
+      @keyframes pulse { 0% { opacity: .35; } 100% { opacity: 1; } }
+      .cards { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 11px; }
+      .card {
+        background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+        padding: 9px 13px; min-width: 132px;
+      }
+      .card .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+      .card .v { font-size: 18px; font-weight: 700; margin-top: 3px; }
+      .card .sub { color: var(--muted); font-size: 11px; margin-top: 2px; }
+      .green { color: var(--green); }
+      .red { color: var(--red); }
+      .neutral { color: var(--muted); }
+      main { padding: 14px 18px 60px; }
+      table { width: 100%; border-collapse: collapse; }
+      thead th {
+        position: sticky; top: 0; background: var(--panel2);
+        text-align: right; color: var(--muted); font-weight: 600; font-size: 11px;
+        text-transform: uppercase; letter-spacing: .5px; padding: 9px 12px;
+        border-bottom: 1px solid var(--line);
+      }
+      thead th.l, tbody td.l { text-align: left; }
+      tbody td { padding: 7px 12px; text-align: right; border-bottom: 1px solid #131a28; white-space: nowrap; }
+      tbody tr:hover { background: #131a28; }
+      tbody tr.flash { animation: flashrow 1.1s ease; }
+      @keyframes flashrow { 0% { background: #1d3a2e; } 100% { background: transparent; } }
+      .rank { color: var(--muted); width: 44px; }
+      .rank.top { color: #ffd34d; font-weight: 700; }
+      .name { max-width: 380px; overflow: hidden; text-overflow: ellipsis; }
+      .fam { color: var(--muted); font-size: 11px; }
+      .pill { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 5px; }
+      .pill.Up { background: #06311f; color: var(--up); border: 1px solid #0f5b3c; }
+      .pill.Down { background: #380f13; color: var(--down); border: 1px solid #6e1d24; }
+      .dim { color: var(--muted); }
+      .foot { color: var(--muted); font-size: 11px; margin-top: 10px; }
+      #status { font-size: 11px; color: var(--muted); margin-left: auto; }
+      .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background: var(--red); margin-right:5px; vertical-align: middle; }
+      .dot.on { background: var(--green); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="titlebar">
+        <h1>🤖 BotSim · Polymarket BTC 5-min Up/Down</h1>
+        <span class="badge paper">PAPER TRADING — NO REAL ORDERS</span>
+        <span id="status"><span class="dot" id="dot"></span><span id="conn">connecting…</span></span>
+      </div>
+      <div class="cards">
+        <div class="card"><div class="k">Combined P/L</div><div class="v" id="combined">$0.00</div><div class="sub" id="botcount">0 bots</div></div>
+        <div class="card"><div class="k">BTC (blended)</div><div class="v" id="btc">—</div><div class="sub" id="btcsub">Binance / Coinbase</div></div>
+        <div class="card"><div class="k">Active Market</div><div class="v" id="mkt">—</div><div class="sub" id="mktsub">waiting for window…</div></div>
+        <div class="card"><div class="k">Closes In</div><div class="v" id="countdown">—</div><div class="sub" id="implied">Up — / Down —</div></div>
+        <div class="card"><div class="k">Markets Resolved</div><div class="v" id="resolved">0</div><div class="sub" id="trades">0 trades</div></div>
+        <div class="card"><div class="k">Feed Delay (decision)</div><div class="v" id="lat">—</div><div class="sub" id="delaysub">measured transport —</div></div>
+        <div class="card"><div class="k">Run Time</div><div class="v" id="runtime">0s</div><div class="sub" id="updated">—</div></div>
+      </div>
+    </header>
+    <main>
+      <table>
+        <thead>
+          <tr>
+            <th class="l">#</th>
+            <th class="l">Strategy</th>
+            <th>Total P/L</th>
+            <th>Realized</th>
+            <th>Trades</th>
+            <th>Win %</th>
+            <th>Avg / Trade</th>
+            <th class="l">Open Position</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="foot" id="foot"></div>
+    </main>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let last = null;
+      let prevPnl = new Map();
+
+      const fmtUSD = (n) => {
+        n = Number(n) || 0;
+        const s = n < 0 ? '-' : '';
+        return s + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      };
+      const fmtSigned = (n) => (Number(n) > 0 ? '+' : '') + fmtUSD(n);
+      const cls = (n) => (n > 0 ? 'green' : n < 0 ? 'red' : 'neutral');
+      const pct = (x) => (Number(x) * 100).toFixed(1) + '%';
+
+      function fmtDur(ms) {
+        const s = Math.floor(ms / 1000);
+        const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+        if (h) return `${h}h ${m}m`;
+        if (m) return `${m}m ${ss}s`;
+        return `${ss}s`;
+      }
+      const mmss = (sec) => {
+        if (sec == null || sec < 0) sec = 0;
+        const m = Math.floor(sec / 60), s = sec % 60;
+        return `${m}:${String(s).padStart(2, '0')}`;
+      };
+
+      function render(d, flash) {
+        last = d;
+        // header
+        $('combined').textContent = fmtSigned(d.totals.combinedPnL);
+        $('combined').className = 'v ' + cls(d.totals.combinedPnL);
+        $('botcount').textContent = d.totals.bots + ' bots · ' + d.totals.openPositions + ' open';
+        if (d.btc.price != null) $('btc').textContent = fmtUSD(d.btc.price);
+        $('btcsub').textContent =
+          (d.btc.binance != null ? fmtUSD(d.btc.binance) : '—') + ' / ' +
+          (d.btc.coinbase != null ? fmtUSD(d.btc.coinbase) : '—');
+        if (d.market) {
+          $('mkt').textContent = d.market.label;
+          $('mktsub').textContent = d.market.slug;
+          const up = d.market.upMid != null ? pct(d.market.upMid) : '—';
+          const dn = d.market.downMid != null ? pct(d.market.downMid) : '—';
+          $('implied').innerHTML = `<span class="green">Up ${up}</span> / <span class="red">Down ${dn}</span>`;
+          $('countdown').dataset.end = d.market.periodEnd;
+        } else {
+          $('mkt').textContent = '—';
+          $('mktsub').textContent = 'waiting for next window…';
+          $('countdown').dataset.end = '';
+        }
+        $('resolved').textContent = d.totals.resolved;
+        $('trades').textContent = d.totals.trades + ' trades';
+        const L = d.latency || {};
+        const dl = d.delays || {};
+        // Headline: the decision delay we deliberately impose on each feed.
+        $('lat').textContent = `B:${dl.binance} C:${dl.coinbase} P:${dl.polymarket} ms`;
+        // Sub: measured transport latency (clamped >= 0; negatives are clock skew).
+        const meas = ['binance', 'coinbase', 'polymarket']
+          .map((k) => (L[k] != null ? `${k[0].toUpperCase()}:${Math.max(0, Math.round(L[k]))}ms` : null))
+          .filter(Boolean).join('  ');
+        $('delaysub').textContent = meas ? `measured ${meas}` : 'measured —';
+        $('runtime').textContent = fmtDur(d.runtimeMs);
+        $('updated').textContent = 'updated ' + new Date(d.generatedAt).toLocaleTimeString();
+
+        // rows
+        const tb = $('rows');
+        const frag = document.createDocumentFragment();
+        const changed = new Set();
+        for (const r of d.rows) {
+          if (flash && prevPnl.has(r.id) && prevPnl.get(r.id) !== r.totalPnL) changed.add(r.id);
+          prevPnl.set(r.id, r.totalPnL);
+        }
+        for (const r of d.rows) {
+          const tr = document.createElement('tr');
+          if (changed.has(r.id)) tr.className = 'flash';
+          let open = '<span class="dim">—</span>';
+          if (r.open) {
+            open =
+              `<span class="pill ${r.open.side}">${r.open.side}</span> ` +
+              `${r.open.shares} sh @ ${r.open.entry} → ${r.open.mark} ` +
+              `<span class="${cls(r.open.unrealized)}">(${fmtSigned(r.open.unrealized)})</span>`;
+          }
+          tr.innerHTML =
+            `<td class="l rank ${r.rank <= 3 ? 'top' : ''}">${r.rank}</td>` +
+            `<td class="l name" title="${r.name}">${r.name}</td>` +
+            `<td class="${cls(r.totalPnL)}">${fmtSigned(r.totalPnL)}</td>` +
+            `<td class="${cls(r.realizedPnL)}">${fmtSigned(r.realizedPnL)}</td>` +
+            `<td>${r.trades}</td>` +
+            `<td class="${r.winRate >= 0.5 ? 'green' : r.trades ? 'red' : 'neutral'}">${r.trades ? pct(r.winRate) : '—'}</td>` +
+            `<td class="${cls(r.avgPerTrade)}">${r.trades ? fmtSigned(r.avgPerTrade) : '—'}</td>` +
+            `<td class="l">${open}</td>`;
+          frag.appendChild(tr);
+        }
+        tb.replaceChildren(frag);
+        $('foot').textContent =
+          'Paper trading only · settles on the official Binance 5-minute candle · ' +
+          'leaderboard pushes on every closed trade.';
+      }
+
+      // local countdown + runtime ticker between server pushes
+      setInterval(() => {
+        const end = Number($('countdown').dataset.end || 0);
+        if (end) $('countdown').textContent = mmss(Math.floor(end - Date.now() / 1000));
+        if (last) $('runtime').textContent = fmtDur(Date.now() - (last.generatedAt - last.runtimeMs));
+      }, 1000);
+
+      function connect() {
+        const es = new EventSource('/events');
+        const setConn = (ok, t) => { $('dot').className = 'dot' + (ok ? ' on' : ''); $('conn').textContent = t; };
+        es.addEventListener('open', () => setConn(true, 'live'));
+        es.addEventListener('error', () => setConn(false, 'reconnecting…'));
+        // 'leaderboard' = a trade just closed (guaranteed refresh); 'tick' = heartbeat
+        es.addEventListener('leaderboard', (e) => { setConn(true, 'live'); render(JSON.parse(e.data), true); });
+        es.addEventListener('tick', (e) => { setConn(true, 'live'); render(JSON.parse(e.data), false); });
+      }
+      connect();
+    </script>
+  </body>
+</html>
